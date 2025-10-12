@@ -4,8 +4,8 @@ import { createTRPCRouter, publicProcedure, roomProcedure } from "../trpc";
 import { tryCatch } from "~/lib/utils";
 import { redis } from "~/lib/redis";
 import { TRPCError } from "@trpc/server";
-import { pusher } from "~/lib/pusher";
 import { z } from "zod";
+import { pusher } from "~/lib/pusher";
 
 export type Player = {
   id: string;
@@ -47,44 +47,68 @@ export const roomRouter = createTRPCRouter({
     return true;
   }),
 
-  join: roomProcedure.mutation(async ({ ctx }) => {
+  getPlayers: roomProcedure.query(async ({ ctx }) => {
     const { room } = ctx;
-    const playerId = nanoid();
-
-    if (room.players.length >= 2) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "This room is full.",
-      });
-    }
-
-    room.players.push({ id: playerId, ready: false });
-    const result = await tryCatch(redis.set(`room:${room.id}`, room));
-
-    if (result.error) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Could not join the room. Please try again.",
-      });
-    }
-
-    void pusher.trigger(`room-${room.id}`, "players-changed", {
-      players: room.players,
-    });
-
-    return {
-      playerId,
-      players: room.players,
-    };
+    return room.players;
   }),
 
-  toggleReady: roomProcedure
+  addPlayer: roomProcedure
     .input(z.object({ playerId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const { room } = ctx;
-      const { playerId } = input;
+      room.players.push({ id: input.playerId, ready: false });
 
-      const player = room.players.find((player) => player.id === playerId);
+      const result = await tryCatch(redis.set(`room:${room.id}`, room));
+
+      if (result.error) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Could not add a player. Please try again later.",
+        });
+      }
+
+      void pusher.trigger(`presence-room-${room.id}`, "players-changed", {
+        players: room.players,
+      });
+
+      return {
+        ok: true,
+      };
+    }),
+
+  removePlayer: roomProcedure
+    .input(z.object({ playerId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const { room } = ctx;
+      room.players = room.players.filter(
+        (player) => player.id !== input.playerId,
+      );
+
+      const result = await tryCatch(redis.set(`room:${room.id}`, room));
+
+      if (result.error) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Could not remove a player. Please try again later.",
+        });
+      }
+
+      void pusher.trigger(`presence-room-${room.id}`, "players-changed", {
+        players: room.players,
+      });
+
+      return {
+        ok: true,
+      };
+    }),
+
+  togglePlayerReady: roomProcedure
+    .input(z.object({ playerId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const { room } = ctx;
+      const player = room.players.find(
+        (player) => player.id === input.playerId,
+      );
 
       if (!player) {
         throw new TRPCError({
@@ -100,16 +124,16 @@ export const roomRouter = createTRPCRouter({
       if (result.error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "Could not toggle ready state. Please try again.",
+          message: "Could not toggle player ready. Please try again later.",
         });
       }
 
-      void pusher.trigger(`room-${room.id}`, "players-changed", {
+      void pusher.trigger(`presence-room-${room.id}`, "players-changed", {
         players: room.players,
       });
 
       return {
-        players: room.players,
+        ok: true,
       };
     }),
 });

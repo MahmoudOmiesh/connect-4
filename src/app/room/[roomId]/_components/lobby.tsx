@@ -1,6 +1,7 @@
 "use client";
 
 import { CheckIcon, CopyIcon, SettingsIcon, XIcon } from "lucide-react";
+import type { Members } from "pusher-js";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
@@ -12,7 +13,6 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
-import { Spinner } from "~/components/ui/spinner";
 import { env } from "~/env";
 import { pusherClient } from "~/lib/pusher-client";
 import { cn } from "~/lib/utils";
@@ -28,40 +28,47 @@ export function Lobby({ roomId }: { roomId: string }) {
     (player) => player.id === playerId && player.ready,
   );
 
-  const joinRoomMutation = api.room.join.useMutation({
-    onSuccess: ({ players, playerId }) => {
-      setPlayerId(playerId);
-      setPlayers(players);
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
+  const togglePlayerReady = api.room.togglePlayerReady.useMutation({
+    onMutate: (data) => {
+      setPlayers((players) =>
+        players.map((player) =>
+          player.id === data.playerId
+            ? { ...player, ready: !player.ready }
+            : player,
+        ),
+      );
 
-  const toggleReadyMutation = api.room.toggleReady.useMutation({
-    onSuccess: ({ players }) => {
-      setPlayers(players);
+      return { oldPlayers: players };
     },
-    onError: (error) => {
+    onError: (error, _, ctx) => {
+      setPlayers(ctx?.oldPlayers ?? []);
       toast.error(error.message);
     },
   });
 
   useEffect(() => {
-    const channel = pusherClient.subscribe(`room-${roomId}`);
+    const roomChannel = pusherClient.subscribe(`presence-room-${roomId}`);
 
-    channel.bind("players-changed", (data: { players: Player[] }) => {
+    function handleSubscriptionSucceeded(members: Members) {
+      const me = members.me as { id: string };
+      setPlayerId(me.id);
+    }
+
+    function handlePlayersChanged(data: { players: Player[] }) {
       setPlayers(data.players);
-    });
+    }
 
-    joinRoomMutation.mutate({ roomId });
+    roomChannel.bind(
+      "pusher:subscription_succeeded",
+      handleSubscriptionSucceeded,
+    );
+
+    roomChannel.bind("players-changed", handlePlayersChanged);
 
     return () => {
-      channel.unbind("players-changed");
-      pusherClient.unsubscribe(`room-${roomId}`);
+      roomChannel.unbind_all();
+      roomChannel.unsubscribe();
     };
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
 
   return (
@@ -74,19 +81,13 @@ export function Lobby({ roomId }: { roomId: string }) {
           </CardDescription>
           <div className="grid grid-cols-2 gap-2">
             <Button
-              disabled={toggleReadyMutation.isPending || !playerId}
-              onClick={() =>
-                toggleReadyMutation.mutate({ playerId: playerId!, roomId })
-              }
+              onClick={() => {
+                if (togglePlayerReady.isPending) return;
+                togglePlayerReady.mutate({ roomId, playerId: playerId ?? "" });
+              }}
             >
-              {isReady ? "Set Not Ready" : "Set Ready"}{" "}
-              {toggleReadyMutation.isPending ? (
-                <Spinner />
-              ) : isReady ? (
-                <CheckIcon />
-              ) : (
-                <XIcon />
-              )}
+              {isReady ? "Not Ready" : "Ready"}{" "}
+              {isReady ? <XIcon /> : <CheckIcon />}
             </Button>
             <Button>
               Options <SettingsIcon />
