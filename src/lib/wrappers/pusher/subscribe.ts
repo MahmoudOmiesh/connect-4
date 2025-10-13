@@ -2,7 +2,7 @@ import type { Channel } from "pusher-js";
 import type { EventDataMap } from "./utils";
 import { EventDefinitions, type EventName } from "~/lib/schemas/events";
 
-export function susbscribeToEvent<T extends EventName>(
+export function subscribeToEvent<T extends EventName>(
   channel: Channel,
   eventName: T,
   callback: (data: EventDataMap[T]) => void,
