@@ -82,8 +82,9 @@ export function Lobby({ roomId }: { roomId: string }) {
           </CardDescription>
           <div className="grid grid-cols-2 gap-2">
             <Button
+              disabled={!playerId}
               onClick={() => {
-                if (togglePlayerReady.isPending) return;
+                if (togglePlayerReady.isPending || !playerId) return;
                 togglePlayerReady.mutate({ roomId, playerId: playerId ?? "" });
               }}
             >

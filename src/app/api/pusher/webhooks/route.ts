@@ -26,15 +26,41 @@ export async function POST(request: Request) {
     }[];
   };
 
-  parsedBody.events.forEach((event) => {
-    const roomId = event.channel.split("-")[2]!;
+  await Promise.all(
+    parsedBody.events.map(async (event) => {
+      const channelParts = event.channel.split("-");
 
-    if (event.name === "member_added") {
-      void tryCatch(api.room.addPlayer({ roomId, playerId: event.user_id }));
-    } else if (event.name === "member_removed") {
-      void tryCatch(api.room.removePlayer({ roomId, playerId: event.user_id }));
-    }
-  });
+      if (
+        channelParts.length !== 3 ||
+        channelParts[0] !== "presence" ||
+        channelParts[1] !== "room"
+      ) {
+        console.error("Invalid channel format:", event.channel);
+        return;
+      }
+
+      const roomId = channelParts[2]!;
+
+      switch (event.name) {
+        case "member_added":
+          const { error } = await tryCatch(
+            api.room.addPlayer({ roomId, playerId: event.user_id }),
+          );
+          if (error) {
+            console.error("Failed to add player:", error);
+          }
+          break;
+        case "member_removed":
+          const { error: removeError } = await tryCatch(
+            api.room.removePlayer({ roomId, playerId: event.user_id }),
+          );
+          if (removeError) {
+            console.error("Failed to remove player:", removeError);
+          }
+          break;
+      }
+    }),
+  );
 
   return new Response("OK");
 }

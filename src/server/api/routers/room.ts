@@ -42,6 +42,14 @@ export const roomRouter = createTRPCRouter({
     .input(z.object({ playerId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const { room } = ctx;
+
+      if (room.players.some((player) => player.id === input.playerId)) {
+        // skip if player already exists
+        return {
+          ok: true,
+        };
+      }
+
       room.players.push({ id: input.playerId, ready: false });
 
       const { error } = await tryCatch(redisWrapper.updateRoom(room.id, room));
