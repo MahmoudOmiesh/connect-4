@@ -1,9 +1,8 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import z, { ZodError } from "zod";
-import { redis } from "~/lib/redis";
 import { tryCatch } from "~/lib/utils";
-import type { Room } from "./routers/room";
+import { redisWrapper } from "~/lib/wrappers/redis";
 
 export const createTRPCContext = async (opts: { headers: Headers }) => {
   return {
@@ -46,13 +45,22 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
 });
 
 const roomValidMiddleware = t.middleware(async ({ next, input }) => {
-  const castedInput = z.object({ roomId: z.string() }).parse(input);
+  const { success, data: validatedInput } = z
+    .object({ roomId: z.string() })
+    .safeParse(input);
+
+  if (!success) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Invalid input, please provide a valid room ID.",
+    });
+  }
 
   const { data: room, error } = await tryCatch(
-    redis.get(`room:${castedInput.roomId}`),
+    redisWrapper.getRoom(validatedInput.roomId),
   );
 
-  if (error || !room) {
+  if (error || room === null) {
     throw new TRPCError({
       code: "NOT_FOUND",
       message:
@@ -62,7 +70,7 @@ const roomValidMiddleware = t.middleware(async ({ next, input }) => {
 
   return next({
     ctx: {
-      room: room as Room,
+      room,
     },
   });
 });

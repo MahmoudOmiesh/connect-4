@@ -16,8 +16,9 @@ import {
 import { env } from "~/env";
 import { pusherClient } from "~/lib/pusher-client";
 import { cn } from "~/lib/utils";
-import type { Player } from "~/server/api/routers/room";
+import type { Player } from "~/lib/schemas/room";
 import { api } from "~/trpc/react";
+import { susbscribeToEvent } from "~/lib/wrappers/pusher/subscribe";
 
 export function Lobby({ roomId }: { roomId: string }) {
   const [playerId, setPlayerId] = useState<string | null>(null);
@@ -63,7 +64,7 @@ export function Lobby({ roomId }: { roomId: string }) {
       handleSubscriptionSucceeded,
     );
 
-    roomChannel.bind("players-changed", handlePlayersChanged);
+    susbscribeToEvent(roomChannel, "players-changed", handlePlayersChanged);
 
     return () => {
       roomChannel.unbind_all();

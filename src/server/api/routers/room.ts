@@ -2,31 +2,17 @@ import { nanoid } from "nanoid";
 import { createTRPCRouter, publicProcedure, roomProcedure } from "../trpc";
 
 import { tryCatch } from "~/lib/utils";
-import { redis } from "~/lib/redis";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { pusher } from "~/lib/pusher";
-
-export type Player = {
-  id: string;
-  ready: boolean;
-};
-
-export type Room = {
-  id: string;
-  players: Player[];
-};
+import { redisWrapper } from "~/lib/wrappers/redis";
+import { triggerEvent } from "~/lib/wrappers/pusher/trigger";
 
 export const roomRouter = createTRPCRouter({
   create: publicProcedure.mutation(async () => {
     const id = nanoid();
-    const room: Room = {
-      id,
-      players: [],
-    };
-    const result = await tryCatch(redis.set(`room:${id}`, room));
+    const { error } = await tryCatch(redisWrapper.createRoom(id));
 
-    if (result.error) {
+    if (error) {
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Could not create a room. Please try again later.",
@@ -58,16 +44,16 @@ export const roomRouter = createTRPCRouter({
       const { room } = ctx;
       room.players.push({ id: input.playerId, ready: false });
 
-      const result = await tryCatch(redis.set(`room:${room.id}`, room));
+      const { error } = await tryCatch(redisWrapper.updateRoom(room.id, room));
 
-      if (result.error) {
+      if (error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Could not add a player. Please try again later.",
         });
       }
 
-      void pusher.trigger(`presence-room-${room.id}`, "players-changed", {
+      void triggerEvent(`presence-room-${room.id}`, "players-changed", {
         players: room.players,
       });
 
@@ -84,16 +70,16 @@ export const roomRouter = createTRPCRouter({
         (player) => player.id !== input.playerId,
       );
 
-      const result = await tryCatch(redis.set(`room:${room.id}`, room));
+      const { error } = await tryCatch(redisWrapper.updateRoom(room.id, room));
 
-      if (result.error) {
+      if (error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Could not remove a player. Please try again later.",
         });
       }
 
-      void pusher.trigger(`presence-room-${room.id}`, "players-changed", {
+      void triggerEvent(`presence-room-${room.id}`, "players-changed", {
         players: room.players,
       });
 
@@ -119,16 +105,16 @@ export const roomRouter = createTRPCRouter({
 
       player.ready = !player.ready;
 
-      const result = await tryCatch(redis.set(`room:${room.id}`, room));
+      const { error } = await tryCatch(redisWrapper.updateRoom(room.id, room));
 
-      if (result.error) {
+      if (error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Could not toggle player ready. Please try again later.",
         });
       }
 
-      void pusher.trigger(`presence-room-${room.id}`, "players-changed", {
+      void triggerEvent(`presence-room-${room.id}`, "players-changed", {
         players: room.players,
       });
 
