@@ -1,11 +1,11 @@
 import z from "zod";
-import { playerSchema } from "./room";
+import { PlayerSchema } from "./room";
 
 export const EventDefinitions = [
   {
     name: "players-changed" as const,
     dataSchema: z.object({
-      players: z.array(playerSchema),
+      players: z.array(PlayerSchema),
     }),
   },
 ];

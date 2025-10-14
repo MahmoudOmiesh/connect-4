@@ -64,7 +64,7 @@ const roomValidMiddleware = t.middleware(async ({ next, input }) => {
     throw new TRPCError({
       code: "NOT_FOUND",
       message:
-        "Coudln't find this room, maybe it doesn't exist or has been deleted.",
+        "Couldn't find this room, maybe it doesn't exist or has been deleted.",
     });
   }
 

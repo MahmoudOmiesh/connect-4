@@ -1,5 +1,5 @@
 import { redis } from "../redis";
-import { roomSchema, type Room } from "../schemas/room";
+import { RoomSchema, type Room } from "../schemas/room";
 
 function getRoomKey(roomId: string) {
   return `room:${roomId}`;
@@ -11,6 +11,9 @@ export const redisWrapper = {
     const room: Room = {
       id: roomId,
       players: [],
+      state: "lobby",
+      turn: "",
+      board: [],
     };
 
     await redis.set(key, room, {
@@ -26,14 +29,14 @@ export const redisWrapper = {
       return null;
     }
 
-    const parsedRoom = roomSchema.parse(room);
+    const parsedRoom = RoomSchema.parse(room);
     return parsedRoom;
   },
 
   updateRoom: async (roomId: string, room: Room) => {
     const key = getRoomKey(roomId);
 
-    const validatedRoom = roomSchema.parse(room);
+    const validatedRoom = RoomSchema.parse(room);
     await redis.set(key, validatedRoom, {
       ex: 60 * 60 * 24, // 1 day
     });
