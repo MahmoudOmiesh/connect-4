@@ -6,6 +6,31 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { redisWrapper } from "~/lib/wrappers/redis";
 import { triggerEvent } from "~/lib/wrappers/pusher/trigger";
+import type { Room } from "~/lib/schemas/room";
+
+function isRoomReady(room: Room) {
+  return (
+    room.players.length === 2 && room.players.every((player) => player.ready)
+  );
+}
+
+async function startGame(room: Room) {
+  room.state = "playing";
+  room.turn = room.players[0]!.id;
+
+  const { error } = await tryCatch(redisWrapper.updateRoom(room.id, room));
+
+  if (error) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Could not start the game. Please try again later.",
+    });
+  }
+
+  void triggerEvent(`presence-room-${room.id}`, "room-state-changed", {
+    state: "playing",
+  });
+}
 
 export const roomRouter = createTRPCRouter({
   create: publicProcedure.mutation(async () => {
@@ -125,6 +150,10 @@ export const roomRouter = createTRPCRouter({
       void triggerEvent(`presence-room-${room.id}`, "players-changed", {
         players: room.players,
       });
+
+      if (isRoomReady(room)) {
+        await startGame(room);
+      }
 
       return {
         ok: true,

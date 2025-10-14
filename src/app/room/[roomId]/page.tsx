@@ -11,7 +11,7 @@ import { AlertTriangleIcon } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import Link from "next/link";
 import { tryCatch } from "~/lib/utils";
-import { Lobby } from "./_components/lobby";
+import { RoomHandler } from "./_components/room-handler";
 
 export default async function RoomPage({
   params,
@@ -47,5 +47,5 @@ export default async function RoomPage({
     );
   }
 
-  return <Lobby roomId={roomId} />;
+  return <RoomHandler roomId={roomId} />;
 }

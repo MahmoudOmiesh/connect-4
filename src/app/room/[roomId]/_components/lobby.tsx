@@ -1,8 +1,6 @@
 "use client";
 
 import { CheckIcon, CopyIcon, SettingsIcon, XIcon } from "lucide-react";
-import type { Members } from "pusher-js";
-import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import {
@@ -14,16 +12,21 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { env } from "~/env";
-import { pusherClient } from "~/lib/pusher-client";
 import { cn } from "~/lib/utils";
 import type { Player } from "~/lib/schemas/room";
 import { api } from "~/trpc/react";
-import { subscribeToEvent } from "~/lib/wrappers/pusher/subscribe";
 
-export function Lobby({ roomId }: { roomId: string }) {
-  const [playerId, setPlayerId] = useState<string | null>(null);
-  const [players, setPlayers] = useState<Player[]>([]);
-
+export function Lobby({
+  players,
+  setPlayers,
+  playerId,
+  roomId,
+}: {
+  players: Player[];
+  setPlayers: (players: Player[]) => void;
+  playerId: string | null;
+  roomId: string;
+}) {
   const roomURL = `${env.NEXT_PUBLIC_APP_URL}/room/${roomId}`;
   const isReady = players.some(
     (player) => player.id === playerId && player.ready,
@@ -31,13 +34,12 @@ export function Lobby({ roomId }: { roomId: string }) {
 
   const togglePlayerReady = api.room.togglePlayerReady.useMutation({
     onMutate: (data) => {
-      setPlayers((players) =>
-        players.map((player) =>
-          player.id === data.playerId
-            ? { ...player, ready: !player.ready }
-            : player,
-        ),
+      const updatedPlayers = players.map((player) =>
+        player.id === data.playerId
+          ? { ...player, ready: !player.ready }
+          : player,
       );
+      setPlayers(updatedPlayers);
 
       return { oldPlayers: players };
     },
@@ -46,31 +48,6 @@ export function Lobby({ roomId }: { roomId: string }) {
       toast.error(error.message);
     },
   });
-
-  useEffect(() => {
-    const roomChannel = pusherClient.subscribe(`presence-room-${roomId}`);
-
-    function handleSubscriptionSucceeded(members: Members) {
-      const me = members.me as { id: string };
-      setPlayerId(me.id);
-    }
-
-    function handlePlayersChanged(data: { players: Player[] }) {
-      setPlayers(data.players);
-    }
-
-    roomChannel.bind(
-      "pusher:subscription_succeeded",
-      handleSubscriptionSucceeded,
-    );
-
-    subscribeToEvent(roomChannel, "players-changed", handlePlayersChanged);
-
-    return () => {
-      roomChannel.unbind_all();
-      roomChannel.unsubscribe();
-    };
-  }, [roomId]);
 
   return (
     <div className="grid min-h-screen place-items-center">

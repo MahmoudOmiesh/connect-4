@@ -1,4 +1,6 @@
+import { createBoard } from "../connect-4/board";
 import { redis } from "../redis";
+import { BOARD_SIZES } from "../schemas/board";
 import { RoomSchema, type Room } from "../schemas/room";
 
 function getRoomKey(roomId: string) {
@@ -13,7 +15,7 @@ export const redisWrapper = {
       players: [],
       state: "lobby",
       turn: "",
-      board: [],
+      board: createBoard(BOARD_SIZES[0]),
     };
 
     await redis.set(key, room, {

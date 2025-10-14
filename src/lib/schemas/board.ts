@@ -3,13 +3,13 @@ import { z } from "zod";
 export const BOARD_SIZES = [
   {
     name: "7x6",
-    rows: 7,
-    cols: 6,
+    rows: 6,
+    cols: 7,
   },
   {
     name: "8x7",
-    rows: 8,
-    cols: 7,
+    rows: 7,
+    cols: 8,
   },
   {
     name: "8x8",
@@ -18,8 +18,8 @@ export const BOARD_SIZES = [
   },
   {
     name: "9x7",
-    rows: 9,
-    cols: 7,
+    rows: 7,
+    cols: 9,
   },
   {
     name: "9x9",

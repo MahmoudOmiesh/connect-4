@@ -10,7 +10,7 @@ function createBoard(size: BoardSize) {
   // Board is array of columns, each column is an array of cells, bottom of column is index 0
   return Array.from({ length: size.cols }, () =>
     Array.from({ length: size.rows }, () => ""),
-  );
+  ) as Board;
 }
 
 function checkBoardState(board: Board, lastMove: Position): BoardState {
