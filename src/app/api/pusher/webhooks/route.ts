@@ -43,6 +43,7 @@ export async function POST(request: Request) {
 
       switch (event.name) {
         case "member_added":
+          console.log("MEMBER ADDED", event.user_id);
           const { error } = await tryCatch(
             api.room.addPlayer({ roomId, playerId: event.user_id }),
           );
@@ -51,6 +52,7 @@ export async function POST(request: Request) {
           }
           break;
         case "member_removed":
+          console.log("MEMBER REMOVED", event.user_id);
           const { error: removeError } = await tryCatch(
             api.room.removePlayer({ roomId, playerId: event.user_id }),
           );

@@ -75,7 +75,54 @@ const roomValidMiddleware = t.middleware(async ({ next, input }) => {
   });
 });
 
+const playerValidMiddleware = t.middleware(async ({ next, input }) => {
+  const { success, data: validatedInput } = z
+    .object({ roomId: z.string(), playerId: z.string() })
+    .safeParse(input);
+
+  if (!success) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Invalid input, please provide a valid room ID and player ID.",
+    });
+  }
+
+  const { data: room, error } = await tryCatch(
+    redisWrapper.getRoom(validatedInput.roomId),
+  );
+
+  if (error || room === null) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message:
+        "Couldn't find this room, maybe it doesn't exist or has been deleted.",
+    });
+  }
+
+  // console.log("ROOM", room);
+
+  const player = room.players.find(
+    (player) => player.id === validatedInput.playerId,
+  );
+  if (!player) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Player not found in this room.",
+    });
+  }
+
+  return next({
+    ctx: {
+      room,
+    },
+  });
+});
+
 export const publicProcedure = t.procedure.use(timingMiddleware);
 export const roomProcedure = publicProcedure
   .input(z.object({ roomId: z.string() }))
   .use(roomValidMiddleware);
+
+export const playerProcedure = publicProcedure
+  .input(z.object({ roomId: z.string(), playerId: z.string() }))
+  .use(playerValidMiddleware);

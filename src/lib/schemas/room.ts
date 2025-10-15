@@ -4,6 +4,7 @@ import { BoardSchema, type Board } from "./board";
 export const PlayerSchema = z.object({
   id: z.string(),
   ready: z.boolean(),
+  color: z.enum(["red", "blue"]),
 });
 
 export const RoomStateSchema = z.enum(["lobby", "playing"]);

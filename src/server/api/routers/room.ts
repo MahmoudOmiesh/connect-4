@@ -1,4 +1,4 @@
-import { nanoid } from "nanoid";
+import { customAlphabet } from "nanoid";
 import { createTRPCRouter, publicProcedure, roomProcedure } from "../trpc";
 
 import { tryCatch } from "~/lib/utils";
@@ -32,9 +32,12 @@ async function startGame(room: Room) {
   });
 }
 
+// can't use dashes in the ID because it confuses the pusher channel
+const ROOM_ID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
+
 export const roomRouter = createTRPCRouter({
   create: publicProcedure.mutation(async () => {
-    const id = nanoid();
+    const id = customAlphabet(ROOM_ID_ALPHABET)();
     const { error } = await tryCatch(redisWrapper.createRoom(id));
 
     if (error) {
@@ -75,7 +78,8 @@ export const roomRouter = createTRPCRouter({
         };
       }
 
-      room.players.push({ id: input.playerId, ready: false });
+      const color = room.players.length === 0 ? "red" : "blue";
+      room.players.push({ id: input.playerId, ready: false, color });
 
       const { error } = await tryCatch(redisWrapper.updateRoom(room.id, room));
 
