@@ -1,93 +1,92 @@
 "use client";
 
-import type { Channel } from "pusher-js";
-import { useEffect, useState } from "react";
+import { useState, type SetStateAction, type Dispatch, useEffect } from "react";
 import { toast } from "sonner";
+import { checkBoardState } from "~/lib/connect-4/board";
 import { makeMove } from "~/lib/connect-4/moves";
-import type { GameState, Player } from "~/lib/schemas/room";
+import type { Board, Position } from "~/lib/schemas/board";
+import type { Room } from "~/lib/schemas/room";
 import { cn } from "~/lib/utils";
-import { subscribeToEvent } from "~/lib/wrappers/pusher/subscribe";
-import { api } from "~/trpc/react";
 
 export function Game({
-  roomId,
-  player,
-  roomChannel,
+  room,
+  setRoom,
+  playerId,
 }: {
-  roomId: string;
-  player: Player;
-  roomChannel: Channel | null;
+  room: Room;
+  setRoom: Dispatch<SetStateAction<Room>>;
+  playerId: string;
 }) {
   const [isGameOver, setIsGameOver] = useState(false);
-  const [gameState, setGameState] = useState<GameState | null>(null);
-
-  const utils = api.useUtils();
-  const makeMoveMutation = api.game.makeMove.useMutation({
-    // optimistic update
-    onMutate: (data) => {
-      const { newBoard } = makeMove(
-        gameState?.board ?? [],
-        data.column,
-        player.color,
-      );
-
-      console.log(newBoard);
-
-      setGameState({
-        board: newBoard,
-        // N/A means that the turn is not yet determined
-        turn: "N/A",
-      });
-    },
-  });
 
   useEffect(() => {
-    void utils.game.getGame.fetch({ roomId }).then((data) => {
-      setGameState(data);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId]);
+    if (!room.roomChannel) return;
 
-  useEffect(() => {
-    if (!roomChannel) return;
-
-    function handlePlayerWon(data: { playerId: string }) {
-      if (data.playerId === player.id) {
-        toast.success("You won!");
-      } else {
-        toast.error("You lost!");
-      }
-
-      setIsGameOver(true);
+    function handleClientMakeMove(data: { board: Board; turn: string }) {
+      setRoom((prev) => ({ ...prev, board: data.board, turn: data.turn }));
     }
 
-    subscribeToEvent(roomChannel, "game-state-changed", setGameState);
-    subscribeToEvent(roomChannel, "player-won", handlePlayerWon);
+    function handleClientPlayerWon(data: { winnerId: string }) {
+      handlePlayerWon(data.winnerId);
+    }
 
+    room.roomChannel.bind("client-make-move", handleClientMakeMove);
+    room.roomChannel.bind("client-player-won", handleClientPlayerWon);
     return () => {
-      roomChannel.unbind("game-state-changed");
-      roomChannel.unbind("player-won");
+      room.roomChannel?.unbind("client-make-move");
+      room.roomChannel?.unbind("client-player-won");
     };
-  }, [roomId, player.id, roomChannel]);
 
-  if (!gameState) {
-    return <div>Loading...</div>;
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room.roomChannel, setRoom]);
 
-  const isMyTurn = gameState.turn === player?.id;
+  const isMyTurn = room.turn === playerId;
+  const myColor = room.players.find((player) => player.id === playerId)!.color;
+  const otherPlayer = room.players.find((player) => player.id !== playerId)!;
 
   function handleMakeMove(column: number) {
-    const isColumnFull = gameState?.board[column]!.every((cell) => cell !== "");
-    if (
-      !isMyTurn ||
-      !player.id ||
-      makeMoveMutation.isPending ||
-      isColumnFull ||
-      isGameOver
-    )
-      return;
+    const isColumnFull = room.board[column]!.every((cell) => cell !== "");
+    if (!isMyTurn || isColumnFull || isGameOver) return;
 
-    makeMoveMutation.mutate({ roomId, playerId: player.id, column });
+    const { newBoard, lastMove } = makeMove(room.board, column, myColor);
+
+    setRoom((prev) => ({
+      ...prev,
+      board: newBoard,
+      turn: otherPlayer.id,
+    }));
+
+    room.roomChannel?.trigger("client-make-move", {
+      board: newBoard,
+      turn: otherPlayer.id,
+    });
+
+    checkForWin(newBoard, lastMove);
+  }
+
+  function checkForWin(board: Board, lastMove: Position) {
+    const state = checkBoardState(board, lastMove);
+
+    if (state === "red-win" || state === "blue-win") {
+      const winnerId = room.players.find(
+        (player) => player.color === (state === "red-win" ? "red" : "blue"),
+      )!.id;
+
+      handlePlayerWon(winnerId);
+      room.roomChannel?.trigger("client-player-won", {
+        winnerId,
+      });
+    }
+  }
+
+  function handlePlayerWon(winnerId: string) {
+    setIsGameOver(true);
+
+    if (winnerId === playerId) {
+      toast.success("You won!");
+    } else {
+      toast.error("You lost!");
+    }
   }
 
   return (
@@ -95,10 +94,10 @@ export function Game({
       <div
         className="grid overflow-hidden rounded-lg"
         style={{
-          gridTemplateColumns: `repeat(${gameState.board.length}, 1fr)`,
+          gridTemplateColumns: `repeat(${room.board.length}, 1fr)`,
         }}
       >
-        {gameState.board.map((column, index) => (
+        {room.board.map((column, index) => (
           <div
             key={`column-${index}`}
             className={cn(

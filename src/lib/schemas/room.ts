@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { BoardSchema, type Board } from "./board";
+import type { Channel } from "pusher-js";
 
 export const PlayerSchema = z.object({
   id: z.string(),
@@ -11,6 +12,7 @@ export const RoomStateSchema = z.enum(["lobby", "playing"]);
 
 export const RoomSchema = z.object({
   id: z.string(),
+  roomChannel: z.custom<Channel | null>(),
   players: z.array(PlayerSchema),
   state: RoomStateSchema,
   // the id of the player who is currently playing

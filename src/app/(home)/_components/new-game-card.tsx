@@ -8,23 +8,17 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
-import { Spinner } from "~/components/ui/spinner";
 
-import { GamepadIcon } from "lucide-react";
-import { api } from "~/trpc/react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { generateRoomId } from "~/lib/utils";
 
 export function NewGameCard() {
   const router = useRouter();
-  const createRoomMutation = api.room.create.useMutation({
-    onSuccess: (room) => {
-      router.push(`/room/${room.id}`);
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
+
+  function createRoom() {
+    const roomId = generateRoomId();
+    router.push(`/room/${roomId}`);
+  }
 
   return (
     <Card className="w-full max-w-md">
@@ -36,14 +30,8 @@ export function NewGameCard() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Button
-          size="lg"
-          className="w-full"
-          onClick={() => createRoomMutation.mutate()}
-          disabled={createRoomMutation.isPending}
-        >
+        <Button size="lg" className="w-full" onClick={createRoom}>
           New Game{" "}
-          {createRoomMutation.isPending ? <Spinner /> : <GamepadIcon />}
         </Button>
       </CardContent>
     </Card>

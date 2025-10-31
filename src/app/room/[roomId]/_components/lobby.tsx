@@ -14,40 +14,22 @@ import {
 import { env } from "~/env";
 import { cn } from "~/lib/utils";
 import type { Player } from "~/lib/schemas/room";
-import { api } from "~/trpc/react";
 
 export function Lobby({
   players,
-  setPlayers,
   playerId,
   roomId,
+  togglePlayerReady,
 }: {
   players: Player[];
-  setPlayers: (players: Player[]) => void;
   playerId: string | null;
   roomId: string;
+  togglePlayerReady: () => void;
 }) {
   const roomURL = `${env.NEXT_PUBLIC_APP_URL}/room/${roomId}`;
   const isReady = players.some(
     (player) => player.id === playerId && player.ready,
   );
-
-  const togglePlayerReady = api.room.togglePlayerReady.useMutation({
-    onMutate: (data) => {
-      const updatedPlayers = players.map((player) =>
-        player.id === data.playerId
-          ? { ...player, ready: !player.ready }
-          : player,
-      );
-      setPlayers(updatedPlayers);
-
-      return { oldPlayers: players };
-    },
-    onError: (error, _, ctx) => {
-      setPlayers(ctx?.oldPlayers ?? []);
-      toast.error(error.message);
-    },
-  });
 
   return (
     <div className="grid min-h-screen place-items-center">
@@ -58,13 +40,7 @@ export function Lobby({
             Manage your game settings and players.
           </CardDescription>
           <div className="grid grid-cols-2 gap-2">
-            <Button
-              disabled={!playerId}
-              onClick={() => {
-                if (togglePlayerReady.isPending || !playerId) return;
-                togglePlayerReady.mutate({ roomId, playerId: playerId ?? "" });
-              }}
-            >
+            <Button disabled={!playerId} onClick={togglePlayerReady}>
               {isReady ? "Not Ready" : "Ready"}{" "}
               {isReady ? <XIcon /> : <CheckIcon />}
             </Button>

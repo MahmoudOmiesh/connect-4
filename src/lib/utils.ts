@@ -1,4 +1,5 @@
 import { clsx, type ClassValue } from "clsx";
+import { customAlphabet } from "nanoid";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
@@ -26,4 +27,11 @@ export async function tryCatch<T, E = Error>(
   } catch (error) {
     return { data: null, error: error as E };
   }
+}
+
+export function generateRoomId() {
+  const ROOM_ID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
+  const id = customAlphabet(ROOM_ID_ALPHABET)();
+
+  return id;
 }
